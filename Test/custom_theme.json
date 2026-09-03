@@ -1,0 +1,37 @@
+{
+    "CTk": {
+        "fg_color": ["#2e2e2e", "#2e2e2e"],
+        "bg_color": ["#1e1e1e", "#1e1e1e"],
+        "text_color": ["#ffffff", "#ffffff"]
+    },
+    "CTkButton": {
+        "fg_color": ["#3e3e3e", "#3e3e3e"],
+        "hover_color": ["#5e5e5e", "#5e5e5e"],
+        "text_color": ["#ffffff", "#ffffff"]
+    },
+    "CTkLabel": {
+        "fg_color": ["#2e2e2e", "#2e2e2e"],
+        "text_color": ["#ffffff", "#ffffff"]
+    },
+    "CTkFrame": {
+        "fg_color": ["#2e2e2e", "#2e2e2e"],
+        "border_color": ["#3e3e3e", "#3e3e3e"],
+        "corner_radius": 10,
+        "border_width": 2
+    },
+    "CTkTabview": {
+        "fg_color": ["#2e2e2e", "#2e2e2e"],
+        "border_color": ["#3e3e3e", "#3e3e3e"],
+        "text_color": ["#ffffff", "#ffffff"]
+    },
+    "CTkSegmentedButton": {
+        "fg_color": ["#3e3e3e", "#3e3e3e"],
+        "selected_color": ["#5e5e5e", "#5e5e5e"],
+        "unselected_color": ["#2e2e2e", "#2e2e2e"],
+        "text_color": ["#ffffff", "#ffffff"],
+        "selected_hover_color": ["#6e6e6e", "#6e6e6e"],
+        "unselected_hover_color": ["#4e4e4e", "#4e4e4e"],
+        "text_color_disabled": ["#7e7e7e", "#7e7e7e"],
+        "corner_radius": 10
+    }
+}
