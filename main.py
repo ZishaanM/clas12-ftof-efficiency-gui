@@ -1,4 +1,5 @@
-import os  
+import os
+import sys
 import json
 import glob
 import subprocess
@@ -8,10 +9,10 @@ from tkinter import messagebox, Menu, IntVar, StringVar, DISABLED, NORMAL, END  
 
 import pandas as pd
 import customtkinter as ctk
-import CTkMessagebox
-from CTkMessagebox import CTkMessagebox
-from pandasgui import show
 from scipy.stats import ks_2samp
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.environ.get('FTOF_OUTPUT_DIR', os.path.join(BASE_DIR, 'output'))
 
 class Controller:
     def open_website(self):
@@ -19,14 +20,6 @@ class Controller:
 
     def __init__(self, master):
         ctk.set_appearance_mode("dark")  # Dark mode
-        #ctk.set_default_color_theme(r"C:\Users\zisha\SynologyDrive\Drive\Tkinter_GUI\custom_theme.json")  # Load custom theme
-        
-
-        #not needed in final version, just print checks for bg checks
-        print("Custom theme loaded")  # Add this line to check if the theme is loaded
-        theme_file_path = os.path.abspath("custom_theme.json")
-        print(f"Theme file path: {theme_file_path}")
-        #----------------------------------------------------
 
 
         self.master = master
@@ -228,7 +221,7 @@ class Controller:
         self.significance_input = ctk.CTkEntry(self.tab2)
         self.significance_input.grid(row=7, column=2, padx=10, pady=5, sticky="ew")
 
-        self.calculate_button = ctk.CTkButton(self.tab2, text="Calculate", command=self.KS_test(), text_color="white")
+        self.calculate_button = ctk.CTkButton(self.tab2, text="Calculate", command=self.KS_test, text_color="white")
         self.calculate_button.grid(row=9, column=2, columnspan=2, padx=10, pady=10, sticky="ew")
 
         def button_enabler(event=None):
@@ -246,20 +239,38 @@ class Controller:
         self.run_number_entry.bind('<KeyRelease>', button_enabler)
         self.master.protocol('WM_DELETE_WINDOW', self.close_window)
 
+    def wide_csv_path(self, run_number):
+        return os.path.join(OUTPUT_DIR, f'ftof_eff_{run_number}_wide.csv')
+
+    def load_efficiencies(self, run_number, efficiency):
+        path = self.wide_csv_path(run_number)
+        if not os.path.exists(path):
+            subprocess.run([sys.executable, os.path.join(BASE_DIR, 'MakeData_Jan24.py'), run_number])
+        df = pd.read_csv(path)
+        if efficiency == 'All':
+            columns = [f'ef_{n}' for n in range(1, 6)]
+        else:
+            columns = [f'ef_{efficiency}']
+        return df[columns].to_numpy().ravel()
+
     def KS_test(self):
-        self.data1 = self.run1_entry.get()
-        self.data2 = self.run2_entry.get()
+        run1 = self.run1_entry.get().strip()
+        run2 = self.run2_entry.get().strip()
+        try:
+            efficiency = self.efficiency_dropdown.get()
+            self.data1 = self.load_efficiencies(run1, efficiency)
+            self.data2 = self.load_efficiencies(run2, efficiency)
+        except (FileNotFoundError, KeyError):
+            self.message_box_text.set(f"Error: could not load efficiency data for runs '{run1}' and '{run2}'.")
+            return
         self.alternative = self.alternative_dropdown.get()
         self.method = self.method_dropdown.get()
         self.axis = self.axis_value_map[self.axis_dropdown.get()]
         self.nan_policy = self.nan_policy_dropdown.get()
-        self.keepdims = self.keepdims_dropdown.get()
+        self.keepdims = self.keepdims_dropdown.get() == "True"
         self.KS = ks_2samp(self.data1, self.data2, alternative=self.alternative, method=self.method, axis=self.axis, nan_policy=self.nan_policy, keepdims=self.keepdims)
         self.pval = self.KS.pvalue
         self.test_stat = self.KS.statistic
-        self.test_stat = self.test_stat
-        self.pval = self.pval
-        self.alpha = self.significance_input.get()
         self.alpha_str = self.significance_input.get().strip()  # Remove any extra spaces
         if self.alpha_str == "":  
             alpha = 0.05
@@ -269,13 +280,10 @@ class Controller:
             except ValueError:
                 self.message_box_text.set("Error: Invalid significance level. Please enter a valid number.")
                 return
-        '''
-        if(alpha>pval):
-            self.message_box_text.set(f"KS Test Statistic: {test_stat}\nP-Value: {pval}\nRun number data from different distrubutions")
+        if alpha > self.pval:
+            self.message_box_text.set(f"KS Test Statistic: {self.test_stat}\nP-Value: {self.pval}\nRuns likely come from different distributions")
         else:
-            self.message_box_text.set(f"KS Test Statistic: {test_stat}\nP-Value: {pval}\nFail to prove different distributions")
-        # Get the values from the entries
-        '''
+            self.message_box_text.set(f"KS Test Statistic: {self.test_stat}\nP-Value: {self.pval}\nNo significant difference between runs")
 
     def int_checker(self, P):
        if str.isdigit(P) or P == "":
@@ -325,26 +333,27 @@ class Controller:
 
     def graph_data(self):
        self.get_cbox_vals()
-       print(self.get_cbox_vals())
-       self.message_box_text.set('Data from run number ' + str(self.run_number) + ' was definitely graphed.')
        #script to refine data and make graphs
-       self.run_GraphData()
+       result = self.run_GraphData()
+       if result.returncode == 0:
+           self.message_box_text.set('Data from run number ' + str(self.run_number) + ' was graphed (see PDFs/).')
+       else:
+           print(result.stderr)
+           self.message_box_text.set('Graphing failed for run number ' + str(self.run_number) + '. See console output.')
        self.graph_data_button.configure(state=DISABLED)
-       #self.pandasgui_button.configure(state=NORMAL)
-       #self.df = pd.read_csv(r'C:\Users\zisha\SynologyDrive\Drive\Tkinter_GUI\ftof.csv')
-       self.df = pd.read_csv(r'C:\Users\zisha\SynologyDrive\Drive\Tkinter_GUI\CSV\rga_all.csv')
 
 
     def run_MakeData(self):
        print("MakeData was run, Controller")
        #subprocess.run(['python', 'MakeData_Jan24.py', str(self.run_number)],
                       #stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-       subprocess.run(['python', 'MakeData_Jan24.py', str(self.run_number)])
+       subprocess.run([sys.executable, os.path.join(BASE_DIR, 'MakeData_Jan24.py'), str(self.run_number)])
 
 
     def find_overlay(self):
-       #self.overlay = self.overlay_value.get()
-       self.overlay = "None"
+       self.overlay = self.overlay_value.get()
+       if self.overlay not in self.overlayList:
+           self.overlay = 'None'
        if self.overlay == 'None':
            self.ol_secs = 'False'
            self.ol_lys = 'False'
@@ -368,8 +377,10 @@ class Controller:
        self.ser_sectors = json.dumps(self.sectorList)
        self.ser_topologies = json.dumps(self.topologyList)
        self.ser_layers = json.dumps(self.layerList)
-       subprocess.run(['python', 'GraphData_Jan24.py', str(self.run_number), self.ser_sectors, self.ser_layers,
-                       self.ser_topologies, self.ol_secs, self.ol_lys, self.ol_tops], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+       return subprocess.run([sys.executable, os.path.join(BASE_DIR, 'GraphData_Jan24.py'), str(self.run_number),
+                              self.ser_sectors, self.ser_layers, self.ser_topologies,
+                              self.ol_secs, self.ol_lys, self.ol_tops],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
        #subprocess.run(['python', 'GraphData_Jan24.py', str(self.run_number), self.ser_sectors, self.ser_layers,
                        #self.ser_topologies, self.ol_secs, self.ol_lys, self.ol_tops])
 
@@ -429,7 +440,8 @@ class Controller:
 
 
     def open_pandasgui(self):
-       show(self.df)
+       from pandasgui import show
+       show(pd.read_csv(self.wide_csv_path(self.run_number)))
        #self.renew_button.configure(state=NORMAL)
 
 
@@ -439,6 +451,7 @@ class Controller:
        #self.pandasgui_button.configure(state=DISABLED)
        #self.renew_button.configure(state=DISABLED)
 
-root = ctk.CTk()
-Controller_GUI = Controller(root)
-root.mainloop()
+if __name__ == "__main__":
+    root = ctk.CTk()
+    Controller_GUI = Controller(root)
+    root.mainloop()
