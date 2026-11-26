@@ -2,16 +2,27 @@
 import pandas as pd
 import sys
 import numpy as np
-from matplotlib import pyplot as plt
 import os
-import json
+import glob
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get('FTOF_DATA_DIR', os.path.join(BASE_DIR, 'CSV'))
+OUTPUT_DIR = os.environ.get('FTOF_OUTPUT_DIR', os.path.join(BASE_DIR, 'output'))
+
+
+def find_run_file(run_number):
+   # Per-run inputs live two levels down, e.g. CSV/RGA/Inbending/ftof_eff_5032.csv
+   matches = sorted(glob.glob(os.path.join(DATA_DIR, '*', '*', f'ftof_eff_{run_number}.csv')))
+   if not matches:
+       sys.exit(f'No input file ftof_eff_{run_number}.csv found under {DATA_DIR}')
+   return matches[0]
 
 
 def main():
    run_number = sys.argv[1]
-   csv_directory = 'CSV'
-   csv_filename = r'C:\Users\zisha\SynologyDrive\Drive\Tkinter_GUI\CSV\ftof_eff_' + run_number + '.csv'
-   df = pd.read_csv(r'C:\Users\zisha\SynologyDrive\Drive\Tkinter_GUI\CSV\RGA\Inbending\ftof_eff_' + run_number + '.csv')
+   input_path = find_run_file(run_number)
+   print(f'Reading {input_path}')
+   df = pd.read_csv(input_path)
 
 
 
@@ -19,7 +30,7 @@ def main():
    for i in range(1, 6):
        df1 = df[df['topology'] == i]
        df1 = df1.copy(deep=True)
-       df1.drop(['topology'], axis=1, inplace=True)
+       df1 = df1.drop(['topology'], axis=1)
        dfs.append(df1)
 
 
@@ -37,7 +48,7 @@ def main():
 
    df_all['should_1'] = df_all['should']
    df_all['did_1'] = df_all['did']
-   df_all.drop(['should', 'did'], axis=1, inplace=True)
+   df_all = df_all.drop(['should', 'did'], axis=1)
 
 
    for num in range(1, 6):
@@ -72,12 +83,10 @@ def main():
                     'should_4', 'did_4', 'ef_4', 'variance_4', 'should_5', 'did_5', 'ef_5', 'variance_5']]
 
 
-   df_directory = 'CSV'
-   df_filename = 'ftof.csv'
-   df_filepath = os.path.join(df_directory, df_filename)
-   df_filepath = r'C:\Users\zisha\SynologyDrive\Drive\Tkinter_GUI'
-   df_filepath = (r'C:\Users\zisha\SynologyDrive\Drive\Tkinter_GUI\CSV\ftof_eff_' + run_number + '.csv')
+   os.makedirs(OUTPUT_DIR, exist_ok=True)
+   df_filepath = os.path.join(OUTPUT_DIR, f'ftof_eff_{run_number}_wide.csv')
    df_all.to_csv(df_filepath, index=False)
+   print(f'Wrote {df_filepath}')
 
 
 if __name__ == "__main__":
